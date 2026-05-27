@@ -1,0 +1,30 @@
+# Pipeline scratch state (per-repo runtime cache — never commit)
+.pilot/
+
+# Local session state
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if any tooling added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+.vercel
+
+# Autoresearch artifacts (local research harnesses — not shipped)
+autoresearch-*/

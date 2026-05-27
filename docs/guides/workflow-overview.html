@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>md-sdlc-wf · WTF</title>
+<meta name="description" content="Engineer-side SDLC pipeline plugin for Claude Code. PRD digestion → Figma context → repo-aware handoff → AC coverage. Built for the Mudah engineering team." />
+<style>
+  :root {
+    --bg:        oklch(0.16 0.025 270);
+    --bg-2:      oklch(0.20 0.028 270);
+    --paper:     oklch(0.22 0.025 270);
+    --paper-2:   oklch(0.25 0.024 270);
+    --rule:      oklch(0.32 0.030 270);
+    --rule-soft: oklch(0.28 0.028 270);
+    --ink:       oklch(0.97 0.008 270);
+    --ink-mid:   oklch(0.80 0.020 270);
+    --ink-dim:   oklch(0.62 0.030 270);
+    --accent:    oklch(0.70 0.20 280);
+    --accent-2:  oklch(0.70 0.20 230);
+    --accent-mut:oklch(0.70 0.20 270 / 0.16);
+    --post:      oklch(0.74 0.16 155);
+    --pre:       oklch(0.72 0.18 25);
+    --start:     oklch(0.78 0.16 230);
+    --gold:      oklch(0.80 0.16 80);
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 0% -10%, oklch(0.32 0.10 280 / 0.45), transparent 60%),
+      radial-gradient(900px 500px at 100% -10%, oklch(0.32 0.10 200 / 0.30), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    min-height: 100vh;
+  }
+
+  .vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  /* Hero */
+  .hero { padding: 4rem 5vw 1rem; max-width: 1240px; margin: 0 auto; }
+  .tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.78rem;
+    color: var(--ink-mid);
+    background: oklch(0.97 0 0 / 0.04);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+  }
+  .hero h1 {
+    margin: 0 0 1.25rem;
+    font-size: clamp(2rem, 4vw + 1rem, 3.4rem);
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  .hero p.lede {
+    margin: 0 0 2rem;
+    color: var(--ink-mid);
+    font-size: 1.05rem;
+    max-width: 64ch;
+    line-height: 1.55;
+  }
+  .hero .cta {
+    display: inline-block;
+    margin-bottom: 2rem;
+    padding: 0.65rem 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    color: var(--ink);
+    background: var(--bg-2);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+  }
+  .hero .cta span { color: var(--accent); }
+
+  /* Tabs */
+  .tabs input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .tabstrip {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .tabstrip label {
+    cursor: pointer;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.92rem;
+    color: var(--ink-mid);
+    border-radius: 999px;
+    user-select: none;
+    transition: color 140ms ease, background 140ms ease;
+  }
+  .tabstrip label:hover { color: var(--ink); }
+  #t-overview:checked   ~ .tabstrip label[for="t-overview"],
+  #t-benefits:checked   ~ .tabstrip label[for="t-benefits"],
+  #t-pipeline:checked   ~ .tabstrip label[for="t-pipeline"],
+  #t-skills:checked     ~ .tabstrip label[for="t-skills"],
+  #t-agents:checked     ~ .tabstrip label[for="t-agents"],
+  #t-roles:checked      ~ .tabstrip label[for="t-roles"],
+  #t-adoption:checked   ~ .tabstrip label[for="t-adoption"],
+  #t-install:checked    ~ .tabstrip label[for="t-install"] {
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 18px oklch(0.40 0.18 280 / 0.45);
+  }
+
+  /* Panels */
+  .panels { padding: 0 5vw 5rem; max-width: 1240px; margin: 0 auto; }
+  .panel { display: none; }
+  #t-overview:checked  ~ .panels [data-tab="overview"]  { display: block; }
+  #t-benefits:checked  ~ .panels [data-tab="benefits"]  { display: block; }
+  #t-pipeline:checked  ~ .panels [data-tab="pipeline"]  { display: block; }
+  #t-skills:checked    ~ .panels [data-tab="skills"]    { display: block; }
+  #t-agents:checked    ~ .panels [data-tab="agents"]    { display: block; }
+  #t-roles:checked     ~ .panels [data-tab="roles"]     { display: block; }
+  #t-adoption:checked  ~ .panels [data-tab="adoption"]  { display: block; }
+  #t-install:checked   ~ .panels [data-tab="install"]   { display: block; }
+
+  /* Section typography */
+  .panel h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .panel h3 {
+    margin: 2.25rem 0 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .panel p { color: var(--ink-mid); margin: 0 0 1rem; max-width: 72ch; }
+  .panel p em { font-style: italic; color: var(--ink); }
+
+  /* Step / card row */
+  .step-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 1rem;
+  }
+  .step-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .step-row, .step-row.three { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .step-row, .step-row.three { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 1.25rem 1.1rem 1.1rem;
+    position: relative;
+  }
+  .step .num {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: oklch(0.18 0.025 270);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 0.85rem;
+  }
+  .step .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--gold);
+    background: oklch(0.80 0.16 80 / 0.12);
+    border: 1px solid var(--gold);
+    border-radius: 999px;
+    margin-bottom: 0.85rem;
+  }
+  .step b { display: block; font-size: 0.98rem; margin-bottom: 0.35rem; color: var(--ink); }
+  .step p { margin: 0; font-size: 0.88rem; color: var(--ink-dim); line-height: 1.5; }
+  .step code { font-family: var(--mono); font-size: 0.82em; color: var(--accent); background: var(--accent-mut); padding: 0.05em 0.32em; border-radius: 4px; }
+
+  /* Before / After */
+  .twocol {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 720px) { .twocol { grid-template-columns: 1fr; } }
+  .twocol > div { padding: 1.25rem 1.3rem; background: var(--paper); }
+  .twocol > div + div { border-left: 1px solid var(--rule); background: oklch(0.22 0.04 155 / 0.15); }
+  @media (max-width: 720px) { .twocol > div + div { border-left: 0; border-top: 1px solid var(--rule); } }
+  .twocol .col-label {
+    font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.65rem;
+  }
+  .twocol .col-label.before { color: var(--pre); }
+  .twocol .col-label.after  { color: var(--post); }
+  .twocol p { margin: 0 0 0.5rem; font-size: 0.92rem; color: var(--ink-mid); }
+  .twocol ul { margin: 0; padding-left: 1.1rem; color: var(--ink-mid); font-size: 0.92rem; line-height: 1.6; }
+  .twocol ul li + li { margin-top: 0.3rem; }
+  .twocol .time {
+    display: inline-block;
+    margin-top: 0.85rem;
+    padding: 0.3rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    border-radius: 8px;
+  }
+  .twocol .time.bad  { color: var(--pre);  background: oklch(0.72 0.18 25 / 0.12);  border: 1px solid var(--pre); }
+  .twocol .time.good { color: var(--post); background: oklch(0.74 0.16 155 / 0.12); border: 1px solid var(--post); }
+
+  /* Data tables */
+  table.data {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.92rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 1rem 0 1.5rem;
+  }
+  table.data thead th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-dim);
+    padding: 0.85rem 1rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--rule);
+  }
+  table.data tbody td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-mid);
+  }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data tbody tr:hover td { background: oklch(0.97 0 0 / 0.025); }
+  table.data td.k {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  table.data td b { color: var(--ink); font-weight: 600; }
+  table.data code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    color: var(--ink);
+    background: var(--bg-2);
+    padding: 0.08em 0.4em;
+    border-radius: 4px;
+  }
+
+  /* Pills */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.skill { color: var(--accent); }
+  .pill.agent { color: var(--gold); }
+
+  /* Code block */
+  pre.codeblock {
+    background: oklch(0.12 0.020 270);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    margin: 0.5rem 0 1.5rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--ink-mid);
+  }
+  pre.codeblock .k  { color: var(--accent); }
+  pre.codeblock .s  { color: var(--post); }
+  pre.codeblock .c  { color: var(--ink-dim); font-style: italic; }
+  pre.codeblock .p  { color: var(--gold); }
+
+  /* Pipeline diagram (ASCII-style ascii art) */
+  pre.diagram {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--ink-mid);
+    overflow-x: auto;
+    margin: 0.5rem 0 1.5rem;
+  }
+  pre.diagram b { color: var(--accent); font-weight: normal; }
+  pre.diagram .new { color: var(--gold); }
+  pre.diagram .ex  { color: var(--ink-dim); }
+
+  /* Foot */
+  .foot {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 1.5rem 5vw 3rem;
+    font-size: 0.84rem;
+    color: var(--ink-dim);
+    border-top: 1px solid var(--rule-soft);
+  }
+  .foot strong { color: var(--ink); }
+  .foot code { font-family: var(--mono); font-size: 0.85em; background: var(--bg-2); padding: 0.05em 0.35em; border-radius: 4px; }
+  .foot a { color: var(--accent); text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<span class="vh">md-sdlc-wf Skills (3) Agents (6) MCP Servers (2)</span>
+
+<div class="tabs">
+
+  <input type="radio" name="tab" id="t-overview" checked />
+  <input type="radio" name="tab" id="t-benefits" />
+  <input type="radio" name="tab" id="t-pipeline" />
+  <input type="radio" name="tab" id="t-skills" />
+  <input type="radio" name="tab" id="t-agents" />
+  <input type="radio" name="tab" id="t-roles" />
+  <input type="radio" name="tab" id="t-adoption" />
+  <input type="radio" name="tab" id="t-install" />
+
+  <section class="hero">
+    <div class="tags">
+      <span class="tag">Claude Code Plugin</span>
+      <span class="tag">v0.1.0</span>
+      <span class="tag">Mudah Engineering</span>
+    </div>
+    <h1>md-sdlc-wf</h1>
+    <p class="lede">Turn a Confluence PRD into a grounded implementation handoff. Parses the spec, reads Figma, loads repo-aware context, hands off to your project's implementation agent AC-by-AC. Closes the loop with a local AC coverage check before PR.</p>
+
+    <div class="cta">
+      <span>/plugin marketplace add</span> github.com/carousell/md-sdlc-wf
+    </div>
+
+    <div class="tabstrip">
+      <label for="t-overview">Overview</label>
+      <label for="t-benefits">Benefits</label>
+      <label for="t-pipeline">Pipeline</label>
+      <label for="t-skills">Skills (3)</label>
+      <label for="t-agents">Agents (6)</label>
+      <label for="t-roles">Who Adopts</label>
+      <label for="t-adoption">Adoption Guide</label>
+      <label for="t-install">Install</label>
+    </div>
+  </section>
+
+  <div class="panels">
+
+    <!-- OVERVIEW -->
+    <section class="panel" data-tab="overview">
+      <h2>What it is</h2>
+      <p>A Claude Code plugin that adds <em>two layers</em> to your existing SDLC defect filter — one upstream of code, one downstream of code. It does <em>not</em> replace what you already have. Rules, hooks, lint, type-check, code review — all unchanged. The plugin chips in where intent is captured and where coverage is verified.</p>
+
+      <div class="step-row">
+        <div class="step"><span class="num">L0</span><b>Intent capture</b><p>PRD parsed, Figma read, repo context loaded — before a line of code.</p></div>
+        <div class="step"><span class="num">L1-4</span><b>Existing filter</b><p>Rules · hooks · lint · code review. Untouched. Your discipline, your patterns.</p></div>
+        <div class="step"><span class="num">L5</span><b>AC coverage</b><p>Local pre-PR check that tests actually exercise each acceptance criterion.</p></div>
+        <div class="step"><span class="num">L6</span><b>You ship</b><p>Same merge process. Same review path. Less guesswork before, fewer gaps at the end.</p></div>
+      </div>
+
+      <h3>What ships in v0.1.0</h3>
+      <table class="data">
+        <thead><tr><th style="width: 22%">Component</th><th style="width: 14%">Type</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="k">/pilot</td><td><span class="pill skill">skill</span></td><td>Full upstream pipeline orchestrator. Halts at every phase boundary for human review.</td></tr>
+          <tr><td class="k">/digest-spec</td><td><span class="pill skill">skill</span></td><td>Solo PRD reader. ≤100 line dense summary with status warnings.</td></tr>
+          <tr><td class="k">/qa-check</td><td><span class="pill skill">skill</span></td><td>Pre-PR AC coverage gate. Local, advisory, no CI.</td></tr>
+          <tr><td class="k">spec-digester</td><td><span class="pill agent">agent</span></td><td>Confluence PRD → canonical JSON. Layout-agnostic. Drift-aware.</td></tr>
+          <tr><td class="k">figma-reader</td><td><span class="pill agent">agent</span></td><td>Frame screenshot + tokens + Code Connect map. Graceful degrade.</td></tr>
+          <tr><td class="k">context-loader</td><td><span class="pill agent">agent</span></td><td>Per-AC-group context pack: rules + files + PRs + test patterns.</td></tr>
+          <tr><td class="k">qa-validator</td><td><span class="pill agent">agent</span></td><td>Static AC ↔ test mapping with coverage verdict.</td></tr>
+          <tr><td class="k">senior-frontend-engineer</td><td><span class="pill agent">agent (bundled)</span></td><td>Implementation agent for the AC handoff. Stack-aware (Next.js 16, React 19, Mantine, Tailwind). Adopters on other stacks fork to match.</td></tr>
+          <tr><td class="k">senior-code-reviewer</td><td><span class="pill agent">agent (bundled)</span></td><td>Quality reviewer for race conditions, SSR, cleanups, perf, security. Bundled so the plugin ships a complete pipeline.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>What it deliberately does not do</h3>
+      <p>v0.1.0 stays out of: Jira ticket creation, PR title enforcement, CI coverage gates, test scaffolding (TDD lives in your implementation agent), feature-flag wiring suggestions, analytics story proposal, cross-repo coordination, cost telemetry. These were considered and dropped for v1 — the goal is a slim chip-in that ships fast and earns trust before adding scope.</p>
+    </section>
+
+    <!-- BENEFITS -->
+    <section class="panel" data-tab="benefits">
+      <h2>Before / After</h2>
+      <p>What changes when an engineer picks up a new spec.</p>
+
+      <h3>Day-one PRD triage</h3>
+      <div class="twocol">
+        <div>
+          <div class="col-label before">Before — manual triage</div>
+          <ul>
+            <li>Open Confluence, read 12-page PRD top to bottom</li>
+            <li>Mentally extract Acceptance Criteria from the table</li>
+            <li>Click through to the Figma file, find the right cover frame</li>
+            <li>Skim related-docs links, hope nothing critical is buried</li>
+            <li>Type up a personal summary in a scratch doc</li>
+          </ul>
+          <div class="time bad">~30–60 min</div>
+        </div>
+        <div>
+          <div class="col-label after">After — /digest-spec</div>
+          <ul>
+            <li>Paste Confluence URL into <code>/digest-spec</code></li>
+            <li>Dense ≤100-line render: status, AC table, scope, links, rollback</li>
+            <li>Loud warnings if status is <code>Draft</code>, AC missing, or Figma absent</li>
+            <li>Same digest is cached, reused by every other skill</li>
+          </ul>
+          <div class="time good">~30 sec</div>
+        </div>
+      </div>
+
+      <h3>Starting implementation on a story</h3>
+      <div class="twocol">
+        <div>
+          <div class="col-label before">Before — cold start</div>
+          <ul>
+            <li><code>grep</code> the repo for component names mentioned in AC</li>
+            <li>Read <code>.claude/rules/</code> manually, hope to remember conventions</li>
+            <li>Hunt for similar prior PRs via <code>git log</code></li>
+            <li>Find a test file with the right style to mimic</li>
+            <li>Cross-reference Figma tokens by eye</li>
+            <li>Start coding, discover wrong folder structure 20 min in</li>
+          </ul>
+          <div class="time bad">~45–90 min per AC group</div>
+        </div>
+        <div>
+          <div class="col-label after">After — /pilot</div>
+          <ul>
+            <li>Run <code>/pilot</code> once on the PRD URL</li>
+            <li>Get a context pack per AC group: rules summary, ≤15 ranked files, ≤5 prior PRs, ≤3 test patterns</li>
+            <li>Figma tokens + Code Connect paths pre-mapped</li>
+            <li>Implementation agent receives the handoff pre-grounded</li>
+          </ul>
+          <div class="time good">~3–5 min (mostly parallel)</div>
+        </div>
+      </div>
+
+      <h3>Pre-PR coverage check</h3>
+      <div class="twocol">
+        <div>
+          <div class="col-label before">Before — hope</div>
+          <ul>
+            <li>Push branch, raise PR</li>
+            <li>Reviewer (or code-reviewer agent) spots an AC with no test</li>
+            <li>Send back for rework</li>
+            <li>Re-push, re-review cycle</li>
+          </ul>
+          <div class="time bad">~1 review-cycle delay</div>
+        </div>
+        <div>
+          <div class="col-label after">After — /qa-check</div>
+          <ul>
+            <li>Run <code>/qa-check</code> on the branch locally</li>
+            <li>Per-AC verdict: <code>covered</code> / <code>partial</code> / <code>uncovered</code></li>
+            <li>Gaps surfaced with the AC's "Then" clause as a suggested test case</li>
+            <li>Orphan tests flagged</li>
+            <li>Fix before reviewer ever sees the gap</li>
+          </ul>
+          <div class="time good">~10 sec per check</div>
+        </div>
+      </div>
+
+      <h3>Compounding effects</h3>
+      <table class="data">
+        <thead><tr><th>Effect</th><th>Where it shows up</th></tr></thead>
+        <tbody>
+          <tr><td><b>Fewer "what does this AC mean" pings</b></td><td>Engineer reads a normalized digest, not a free-form PRD. Cross-spec conflicts surface automatically.</td></tr>
+          <tr><td><b>Engineers honor repo conventions from line one</b></td><td><code>context-loader</code> distills <code>.claude/rules/</code> into the handoff. No more "I forgot the folder structure rule."</td></tr>
+          <tr><td><b>Code reviewer focuses on quality, not coverage</b></td><td><code>/qa-check</code> catches AC gaps locally. Reviewer time is spent on race conditions, SSR, cleanups — not "did you test AC-07."</td></tr>
+          <tr><td><b>Drafts can't poison implementation</b></td><td>Status gate warns loudly on <code>Draft</code> / <code>Unknown</code> specs. Engineer never builds against shifting AC unknowingly.</td></tr>
+          <tr><td><b>Onboarding new engineers</b></td><td><code>/digest-spec</code> gives a junior the same compressed spec view as a staff engineer. Domain knowledge isn't gated by reading speed.</td></tr>
+          <tr><td><b>Designers' work is honored</b></td><td>Figma reader cross-refs Code Connect, surfaces unmapped components, warns when UI ACs lack a Figma link.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- PIPELINE -->
+    <section class="panel" data-tab="pipeline">
+      <h2>The 5-phase pipeline</h2>
+      <p><code>/pilot &lt;PRD-url-or-Jira-epic&gt;</code> runs the full flow. Phases 1–2 in parallel. The skill halts after every phase so a human picks <em>continue / edit / abort</em>.</p>
+
+<pre class="diagram"><b>/pilot</b> &lt;PRD url or Jira epic&gt;
+   │
+   ├── <b>Phase 1</b> ───► <span class="new">spec-digester</span>   ──► digest.json  (status gate fires here)
+   │
+   ├── <b>Phase 2</b> ───► <span class="new">figma-reader</span>    ──► figma.json   (parallel with Phase 1)
+   │
+   ├── <b>Phase 3</b> ───► optional ADR stub from "Technical Approach"
+   │
+   ├── <b>Phase 4</b> ───► group ACs by platform + design ref  (G1, G2, …)
+   │
+   ├── <b>Phase 5</b> ───► <span class="new">context-loader</span>  ──► context/G&lt;n&gt;.md  (parallel per group)
+   │                                                │
+   │                                                │ Each context pack carries:
+   │                                                │   • rules summary from .claude/rules/
+   │                                                │   • ≤15 ranked relevant files
+   │                                                │   • ≤5 prior related PRs
+   │                                                │   • ≤3 test patterns to mimic
+   │                                                ▼
+   │
+   └── <b>Phase 6</b> ───► HANDOFF per group ────► <span class="ex">senior-frontend-engineer</span>
+                          (one group at a time,           │   (existing agent)
+                           human-paced, halts at each)    │
+                                                          │ Reads context/G&lt;n&gt;.md
+                                                          │ Writes implementation code
+                                                          │ Writes failing test first (TDD)
+                                                          │
+                                                          │ ── Pre-edit hooks ────────────
+                                                          │    enforce-mantine-styling.sh
+                                                          │    protect-files.sh
+                                                          │    block-dangerous.sh
+                                                          │
+                                                          │ ── Post-edit hooks ───────────
+                                                          │    auto-format.sh   (Prettier)
+                                                          │    lint-check.sh    (ESLint --fix)
+                                                          │    type-check.sh    (tsc)
+                                                          │
+                                                          ▼
+                                                  <span class="ex">senior-code-reviewer</span>
+                                                          │   (existing agent)
+                                                          │
+                                                          │ Race conditions, stale closures,
+                                                          │ SSR correctness, missing cleanup,
+                                                          │ project rule adherence, perf,
+                                                          │ security. NOT AC coverage —
+                                                          │ that's /qa-check's job.
+                                                          │
+                                                          ▼
+                                                       PR-ready
+                                                          │
+                  ◄───────────────────────────────────────┘
+                  │
+   <b>/qa-check</b> &lt;branch or PR&gt;
+                  │
+                  └─► <span class="new">qa-validator</span>  ──► AC ↔ test coverage report
+                       (local, advisory, no merge gate)
+
+                       For each AC in the spec touched by the diff:
+                         • find test files referencing the AC ID
+                         • verify test is not .skip / .todo / stubbed
+                         • verify test exercises Given / When / Then
+                       Emit: covered · partial · uncovered + orphan tests
+                       Verdict: PASS · WARN · FAIL (advisory threshold)
+</pre>
+
+<h3>Where the new and existing pieces meet</h3>
+<p>The pipeline is deliberately bookended around the existing <code>.claude/</code> defect filter. New components only at the upstream end (Phase 1–5) and the downstream end (<code>/qa-check</code>). Everything between — <code>senior-frontend-engineer</code> writing code under hooks + rules + TDD, then <code>senior-code-reviewer</code> auditing for quality — runs exactly as it does today, unchanged.</p>
+
+<table class="data">
+  <thead><tr><th style="width: 26%">Stage</th><th style="width: 16%">Source</th><th>Concern</th></tr></thead>
+  <tbody>
+    <tr><td><b>Spec digest</b></td>           <td><span class="pill agent">new</span></td>  <td>Parse PRD layout-agnostic → JSON. Status gate. Drift detection via Confluence version id.</td></tr>
+    <tr><td><b>Figma read</b></td>            <td><span class="pill agent">new</span></td>  <td>Cover frame, tokens, Code Connect mapping. Graceful degrade if Figma MCP absent.</td></tr>
+    <tr><td><b>Context loading</b></td>       <td><span class="pill agent">new</span></td>  <td>Distill <code>.claude/rules/</code> + repo files + prior PRs + test patterns into a per-AC-group handoff.</td></tr>
+    <tr><td><b>Implementation</b></td>        <td><span class="pill skill">existing</span></td>  <td><code>senior-frontend-engineer</code> agent. Writes code + tests under TDD discipline.</td></tr>
+    <tr><td><b>Hook enforcement</b></td>      <td><span class="pill skill">existing</span></td>  <td>Pre-edit + post-edit shell hooks: mantine-styling, lint, type-check, auto-format, protect-files, block-dangerous.</td></tr>
+    <tr><td><b>Code review</b></td>           <td><span class="pill skill">existing</span></td>  <td><code>senior-code-reviewer</code> agent. Quality, perf, security, rule adherence.</td></tr>
+    <tr><td><b>AC coverage check</b></td>     <td><span class="pill agent">new</span></td>  <td><code>qa-validator</code>. Static AC ↔ test mapping with PASS/WARN/FAIL verdict.</td></tr>
+  </tbody>
+</table>
+
+      <h3>Resumable state</h3>
+      <p>Every run writes scratch to <code>.pilot/&lt;spec-id&gt;/</code> in the current repo:</p>
+<pre class="diagram">.pilot/
+└── &lt;spec-id&gt;/
+    ├── digest.json           ← spec-digester output (with confluence_version_id)
+    ├── figma.json            ← figma-reader output
+    ├── adr.md                ← optional, if "Technical Approach" section present
+    ├── context/
+    │   ├── G1.md             ← per-AC-group context pack
+    │   └── ...
+    └── .last-accessed        ← TTL marker (90-day GC after Done)</pre>
+
+      <p>On rerun, <code>spec-digester</code> checks the Confluence page's <em>version id</em> against the cached digest. If unchanged, cache is reused — no re-fetch. If drifted, the agent auto-refreshes and emits a <code>spec_drifted</code> warning.</p>
+
+      <h3>How it chips into existing <code>.claude/</code> systems</h3>
+      <p>Repos that already use Claude Code with rules, hooks, agents, and skills don't need to change anything. The plugin adds agents alongside existing agents, skills alongside existing skills. <code>context-loader</code> reads whatever <code>.claude/rules/</code> the target repo has and surfaces them to the implementation agent. Your conventions stay yours.</p>
+    </section>
+
+    <!-- SKILLS -->
+    <section class="panel" data-tab="skills">
+      <h2>The 3 skills</h2>
+      <p>Slash-command entry points. Skills are the ergonomic surface; agents do the work.</p>
+
+      <h3><code>/digest-spec</code> — solo PRD reader</h3>
+      <p>Run when an engineer or PM gets a Confluence URL and wants a fast read. No side effects. Cached digest is reused by other skills if you run <code>/pilot</code> later.</p>
+<pre class="codeblock"><span class="c">// example</span>
+<span class="p">/digest-spec</span> <span class="s">https://701search.atlassian.net/wiki/spaces/MUGS/pages/4845633585</span>
+
+<span class="c">// renders</span>
+═══════════════════════════════════════════════════════════════════
+SPEC-2026-042 · Zero Listing Product
+Status: In-Review · Figma: yes · Epic: MDP-580
+═══════════════════════════════════════════════════════════════════
+
+ONE-LINER
+Replace dead-end "No Results" page with 20 related Cars listings
+for 6 URL patterns. Web only. Phase 1 = Country + Region/State.
+
+ACCEPTANCE CRITERIA (15)
+┌──────┬─────────────┬───────────────────────────────────────────┐
+│ AC-01│ Functional  │ Brand filter zero inv → show 20 related   │
+│ AC-02│ Functional  │ Related section auto-renders              │
+│ AC-11│ UI desktop  │ 3-col grid                                │
+│ ...                                                            │
+└──────┴─────────────┴───────────────────────────────────────────┘
+
+⚠ Spec is In-Review (not yet Signed). AC may shift before final.</pre>
+
+      <h3><code>/pilot</code> — full pipeline</h3>
+      <p>Run when an engineer is starting fresh implementation work against a spec. Five phases with checkpoints. Hands off to your project's implementation agent AC-group by AC-group, one at a time.</p>
+<pre class="codeblock"><span class="p">/pilot</span> <span class="s">https://701search.atlassian.net/wiki/spaces/MUGS/pages/4845633585</span>
+
+<span class="c">[1/6] spec-digester ............. ✓ 15 ACs · 4 KPIs · 1 related doc</span>
+<span class="c">[2/6] figma-reader .............. ✓ 4 frames · 2 components mapped</span>
+<span class="c">[3/6] ADR stub written .......... .pilot/SPEC-2026-042/adr.md</span>
+<span class="c">[4/6] AC groups</span>
+       G1 (Functional, 3 ACs):  AC-01, AC-02, AC-03
+       G2 (UI dweb,   2 ACs):   AC-07, AC-11
+       G3 (UI mweb,   4 ACs):   AC-12, AC-13, AC-14, AC-15
+       G4 (Server,    2 ACs):   AC-04, AC-05
+       Continue with all groups? <span class="k">[all / G1,G3 / cancel]</span>
+       <span class="s">&gt; all</span>
+<span class="c">[5/6] context-loader (parallel) . ✓ G1.md, G2.md, G3.md, G4.md</span>
+<span class="c">[6/6] Ready to hand off G1</span>
+       Hand off now? <span class="k">[y / skip / abort]</span>
+       <span class="s">&gt; y</span>
+       <span class="c">→ dispatching implementation agent...</span></pre>
+
+      <h3><code>/qa-check</code> — local AC coverage gate</h3>
+      <p>Run before raising a PR. Resolves the linked spec, finds tests claiming AC coverage, statically verifies they exercise the Given/When/Then. Outputs PASS / WARN / FAIL. Advisory — does not block merges.</p>
+<pre class="codeblock"><span class="p">/qa-check</span> <span class="s">feature/MDP-580-related-grid-dweb</span>
+
+<span class="c">// renders</span>
+COVERAGE REPORT
+┌──────┬─────────────┬───────────┬────────────────────────────────┐
+│ AC   │ Platform    │ Status    │ Test file                       │
+├──────┼─────────────┼───────────┼────────────────────────────────┤
+│ AC-02│ Functional  │ ✓ covered │ RelatedCardGrid.test.tsx:42     │
+│ AC-07│ Content     │ ⚠ partial │ RelatedCardGrid.test.tsx:88     │
+│ AC-11│ UI dweb     │ ✓ covered │ RelatedCardGrid.test.tsx:120    │
+└──────┴─────────────┴───────────┴────────────────────────────────┘
+
+GAPS
+- AC-07 partial: "verified dealer badge (if applicable)" untested
+  → suggested test: card with isVerified=true
+
+VERDICT: WARN ⚠
+  1 partial · 0 uncovered · address before merge.
+  This is advisory. Final merge decision is yours.</pre>
+    </section>
+
+    <!-- AGENTS -->
+    <section class="panel" data-tab="agents">
+      <h2>The 6 agents</h2>
+      <p>Each agent runs in an isolated context window. Heavy reads (PRD text, Figma screenshots, dozens of repo files) stay out of the main conversation. Each agent is callable solo by name when you don't need the whole pipeline.</p>
+
+      <p>Plugin ships 4 <em>new</em> agents for the upstream + downstream chip-in, plus 2 <em>bundled</em> agents that the existing 4-layer defect filter relies on (so adopters get a complete pipeline out of the box, regardless of whether their repo already has these).</p>
+
+      <h3>New — added by the plugin</h3>
+      <table class="data">
+        <thead>
+          <tr><th style="width: 22%">Agent</th><th style="width: 22%">Reads from</th><th>Returns</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="k">spec-digester</td>
+            <td>Atlassian MCP (Confluence + Jira)</td>
+            <td>Canonical JSON with AC matrix, scope, metrics, Figma refs, related docs, status, <code>confluence_version_id</code> for drift detection. Layout-agnostic.</td>
+          </tr>
+          <tr>
+            <td class="k">figma-reader</td>
+            <td>Figma MCP (read-only)</td>
+            <td>Cover-frame screenshot path, design tokens used, component instances with Code Connect mapping, sub-frame inventory with node IDs.</td>
+          </tr>
+          <tr>
+            <td class="k">context-loader</td>
+            <td>Repo files, <code>.claude/rules/</code>, GitHub MCP / <code>git log</code></td>
+            <td>Markdown context pack: rules to honor, ranked relevant files (≤15), prior related PRs (≤5), test patterns to mimic (≤3).</td>
+          </tr>
+          <tr>
+            <td class="k">qa-validator</td>
+            <td>Spec digest, branch <code>git diff</code>, test files</td>
+            <td>Per-AC coverage report with <code>covered</code> / <code>partial</code> / <code>uncovered</code> verdict, plus orphan test detection.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Bundled — for the existing 4-layer filter</h3>
+      <table class="data">
+        <thead>
+          <tr><th style="width: 22%">Agent</th><th style="width: 22%">Role in pipeline</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="k">senior-frontend-engineer</td>
+            <td>Implementation</td>
+            <td>Receives AC-group handoff from <code>/pilot</code>. Writes code under the project's rules + hooks + TDD discipline. Stack-aware (Next.js 16, React 19, TypeScript strict, Mantine 8, Tailwind 4). Adopters on a different stack should fork this agent prompt to match their stack.</td>
+          </tr>
+          <tr>
+            <td class="k">senior-code-reviewer</td>
+            <td>Quality review</td>
+            <td>Audits engineer output for race conditions, stale closures, SSR correctness, missing cleanup, project rule adherence, perf, security. <em>Not</em> AC coverage — that's <code>qa-validator</code>'s concern.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="color: var(--ink-dim); font-size: 0.92rem;">Bundled agents come pre-configured for the Mudah web stack. If your repo already has agents of these names, the plugin's versions are loaded by Claude Code's standard precedence (project <code>.claude/</code> beats plugin). Repo-local customizations always win.</p>
+
+      <h3>Why agents, not skills</h3>
+      <p>Skills load into the main conversation context. Agents have their own isolated context window. PRD text, Figma frame metadata, and dozens of repo file paths would each balloon the main context — so they live in agents that return only summaries. The 3 skills are slash-command wrappers with policy and rendering; the 6 agents do the actual heavy work.</p>
+
+      <h3>Solo invocation</h3>
+      <p>When you don't need the full pipeline, invoke an agent by name:</p>
+<pre class="codeblock"><span class="s">"use spec-digester to pull just the rollback triggers from page 4862836741"</span>
+<span class="s">"use figma-reader on frame 867:6347 and tell me which components lack Code Connect"</span>
+<span class="s">"use context-loader to find relevant files for an API endpoint returning 20 active cars"</span>
+<span class="s">"use qa-validator on the current branch deeply, even for partial coverage"</span></pre>
+    </section>
+
+    <!-- ROLES -->
+    <section class="panel" data-tab="roles">
+      <h2>Who adopts, what they get</h2>
+      <p>The plugin is engineer-first but the artifacts it produces are useful to every role that touches the spec.</p>
+
+      <div class="step-row">
+        <div class="step">
+          <span class="badge">ENGINEER</span>
+          <b>Skip the cold start</b>
+          <p>Run <code>/pilot</code> once. Get AC list, Figma cross-ref, ranked files, prior PRs, test patterns. Code with conventions in front of you.</p>
+        </div>
+        <div class="step">
+          <span class="badge">TECH LEAD</span>
+          <b>Consistent handoffs</b>
+          <p>Every engineer on the team starts with the same compressed digest. No more verbal context transfers or "I assumed you read section 5."</p>
+        </div>
+        <div class="step">
+          <span class="badge">QA</span>
+          <b>Coverage truth</b>
+          <p><code>/qa-check</code> tells you which AC have tests and which have stubs. Orphan tests surface. Coverage gaps are testable, not gut feel.</p>
+        </div>
+        <div class="step">
+          <span class="badge">PM</span>
+          <b>Sanity-check your own PRD</b>
+          <p>Run <code>/digest-spec</code> on your in-flight PRD. Warnings flag missing AC, absent Figma, untrackable metrics. Catch gaps before signoff.</p>
+        </div>
+      </div>
+
+      <div class="step-row three">
+        <div class="step">
+          <span class="badge">DESIGNER</span>
+          <b>Design is referenced, not guessed</b>
+          <p><code>figma-reader</code> pulls the cover frame, tokens, and component mappings. Engineers code against the actual Figma source — not a screenshot in Slack.</p>
+        </div>
+        <div class="step">
+          <span class="badge">TEAM LEAD</span>
+          <b>Fewer clarification pings</b>
+          <p>Standardized intent capture across PMs and verticals. Cross-spec conflicts caught automatically. Distributed knowledge becomes default.</p>
+        </div>
+        <div class="step">
+          <span class="badge">NEW JOINER</span>
+          <b>Onboarding compression</b>
+          <p>The plugin teaches the codebase as a side effect. <code>context-loader</code> surfaces the <code>.claude/rules/</code> that veterans already know.</p>
+        </div>
+      </div>
+
+      <h3>Adoption gradient</h3>
+      <p>You don't need everyone on board to get value. The plugin is useful at every adoption level:</p>
+      <table class="data">
+        <thead><tr><th style="width: 24%">Adoption level</th><th>What it unlocks</th></tr></thead>
+        <tbody>
+          <tr><td><b>One engineer</b></td><td>Personal productivity. <code>/digest-spec</code> alone is worth the install.</td></tr>
+          <tr><td><b>A squad</b></td><td>Consistent context handoffs. Pre-PR <code>/qa-check</code> reduces review-rework cycles.</td></tr>
+          <tr><td><b>Full vertical</b></td><td>Cross-spec conflict detection. Shared <code>.pilot/</code> state during handovers. PMs start running <code>/digest-spec</code> on their own drafts.</td></tr>
+          <tr><td><b>Entire engineering org</b></td><td>Intent capture becomes default. Spec digestion is a 30-second shared step, not a 30-minute per-engineer chore.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ADOPTION -->
+    <section class="panel" data-tab="adoption">
+      <h2>Adoption guide</h2>
+      <p>How to roll this plugin out without forcing it. Designed for a 15+ engineer team across multiple verticals. Plays well at every adoption level — one engineer, one squad, one vertical, or org-wide.</p>
+
+      <h3>Adoption gradient</h3>
+      <p>Earn value at every level. Start at L1. Aim for L2 within 2 weeks if signals are positive. L3 within 8 weeks. L4 is a year-long goal.</p>
+      <table class="data">
+        <thead><tr><th style="width: 14%">Level</th><th style="width: 24%">Who opts in</th><th>What gets unlocked</th></tr></thead>
+        <tbody>
+          <tr><td><b>L1</b></td><td>One engineer (you)</td><td>Personal productivity. <code>/digest-spec</code> alone saves 30 min per spec. <code>/qa-check</code> cuts review-rework loops.</td></tr>
+          <tr><td><b>L2</b></td><td>One squad (3–6 engineers)</td><td>Consistent context handoffs. Shared <code>.pilot/</code> state during handovers. Squad standups reference digest IDs, not PRD URLs.</td></tr>
+          <tr><td><b>L3</b></td><td>One product vertical</td><td>Cross-spec conflict detection via depth-1 related-docs. PMs start using <code>/digest-spec</code> on their own drafts as a sanity check.</td></tr>
+          <tr><td><b>L4</b></td><td>Engineering org</td><td>Intent capture becomes default. Spec triage is a 30-second shared step, not a 30-minute per-engineer chore.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Two-week pilot — recommended starting shape</h3>
+      <p>Goal: validate that the plugin pays for itself within one sprint. If not, drop it cleanly.</p>
+
+      <div class="step-row">
+        <div class="step">
+          <span class="num">D0</span>
+          <b>Preflight</b>
+          <p>Install Claude Code. Confirm Atlassian MCP via <code>/mcp</code>. <code>/plugin install md-sdlc-wf</code>. Pick the next 1–2 PRDs you'd normally read top-to-bottom.</p>
+        </div>
+        <div class="step">
+          <span class="num">W1</span>
+          <b>Solo digest only</b>
+          <p>Run <code>/digest-spec</code> on every PRD you encounter. No <code>/pilot</code> yet. Build trust in the digest output before committing to orchestration.</p>
+        </div>
+        <div class="step">
+          <span class="num">W2</span>
+          <b>Full pipeline</b>
+          <p>For one real spec: <code>/pilot</code> end-to-end, implement against context packs, <code>/qa-check</code> before raising PR.</p>
+        </div>
+        <div class="step">
+          <span class="num">E</span>
+          <b>5-question retro</b>
+          <p>How much time saved per PRD? Did context match what you'd hunt for? Did <code>/qa-check</code> find a gap? Anything blocked? Keep it?</p>
+        </div>
+      </div>
+
+      <h3>Squad rollout (L2)</h3>
+      <p>Once one engineer is sold, expand to the squad. Don't broadcast — show.</p>
+      <table class="data">
+        <thead><tr><th style="width: 22%">Action</th><th>What it looks like</th></tr></thead>
+        <tbody>
+          <tr><td><b>Live demo at standup</b></td><td>Run <code>/digest-spec</code> live on the squad's current top-priority PRD. Show the output, minimal commentary.</td></tr>
+          <tr><td><b>1-paragraph Slack post</b></td><td>"Trying out a Claude Code plugin for spec triage + AC coverage. <code>/digest-spec &lt;url&gt;</code> for a dense summary. Docs: sdlc-pipeline-docs.vercel.app"</td></tr>
+          <tr><td><b>Be reachable</b></td><td>Stay available for 1:1 support during the first week. Most adoption stalls on small papercuts.</td></tr>
+          <tr><td><b>Eyeball 3 metrics weeks 1–4</b></td><td>Time-to-spec-understood, AC misses caught at review, "where does X live" pings. Self-reported is fine.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Vertical rollout (L3)</h3>
+      <p>After squad pilot, expand to all engineers in a product vertical.</p>
+      <table class="data">
+        <thead><tr><th style="width: 30%">Step</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td><b>Announce in vertical channel</b></td><td>Link to the walkthrough page. Don't oversell.</td></tr>
+          <tr><td><b>Add to onboarding doc</b></td><td>1 paragraph in the vertical's engineering onboarding.</td></tr>
+          <tr><td><b>1–2 champions per squad</b></td><td>Engineers who can answer questions inside the squad without escalation.</td></tr>
+          <tr><td><b>30-min lunch-and-learn</b></td><td>Use the live demo from this walkthrough page.</td></tr>
+          <tr><td><b>Encourage PMs to self-digest</b></td><td>Frame as a quality-of-PRD self-check. Catches missing AC, absent Figma, untrackable metrics before signoff.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Org-wide (L4)</h3>
+      <p>Goal: every engineering team uses <code>/digest-spec</code> minimum, with <code>/pilot</code> opt-in.</p>
+      <ul style="color: var(--ink-mid); max-width: 72ch; line-height: 1.7;">
+        <li>Add plugin install to org-wide engineering onboarding checklist</li>
+        <li>30-second mention in monthly engineering all-hands (release notes style)</li>
+        <li>Maintain a <code>#md-sdlc-wf</code> Slack channel for support</li>
+        <li>Bundle into the default Claude Code dotfiles repo if your org has one</li>
+      </ul>
+
+      <h3>Common objections</h3>
+      <table class="data">
+        <thead><tr><th style="width: 38%">Objection</th><th>Honest response</th></tr></thead>
+        <tbody>
+          <tr><td>"I already read PRDs fast. I don't need a digest."</td><td>The digest isn't only for you. It's for the engineer joining the squad next month. Cost is 30 seconds. Run it once; if it tells you nothing new, fine.</td></tr>
+          <tr><td>"I don't trust an AI-generated summary."</td><td>Don't trust it blindly. AC table is preserved verbatim — IDs, scenarios, Given/When/Then. Compression is only around the prose. Verify by spot-checking AC.</td></tr>
+          <tr><td>"It'll break when MCP is down."</td><td><code>/digest-spec</code> returns cached digest with a warning. <code>figma-reader</code> degrades gracefully. Engineer is never blocked outright.</td></tr>
+          <tr><td>"We already have a senior-code-reviewer."</td><td>Different concerns. Reviewer judges code quality. <code>/qa-check</code> judges AC coverage. Both are bundled. Use both.</td></tr>
+          <tr><td>"My team isn't on Claude Code."</td><td>Plugin is engineer-side. PMs, designers, QA don't change anything. Confluence + Figma + Jira workflow stays the same.</td></tr>
+          <tr><td>"My PRDs don't have AC matrices."</td><td>Digest warns loudly with <code>no_acceptance_criteria</code>. That's the plugin doing its job. Push back to the PM.</td></tr>
+          <tr><td>"Will .pilot/ bloat my repo?"</td><td><code>/pilot</code> auto-adds <code>.pilot/</code> to <code>.gitignore</code>. Local scratch only. 90-day TTL after spec status = Done.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>How to know it's working</h3>
+      <p>After 2 months of squad-level adoption, look for these leading indicators:</p>
+      <ul style="color: var(--ink-mid); max-width: 72ch; line-height: 1.7;">
+        <li><b>Engineer-side:</b> PR comments reference <code>SPEC-XXX AC-07</code> instead of "what does this AC mean"</li>
+        <li><b>Reviewer-side:</b> code-review feedback shifts toward quality, not coverage</li>
+        <li><b>PM-side:</b> PMs start fixing their own PRDs based on <code>/digest-spec</code> warnings</li>
+        <li><b>Standup-side:</b> people reference spec IDs + AC group IDs (<code>G3</code>) instead of explaining specs verbally</li>
+      </ul>
+      <p>Don't gate adoption decisions on trailing metrics (defect rates, time-to-merge) — those shift in months. Gate on the leading ones above.</p>
+
+      <h3>When to remove it</h3>
+      <p>Honest exit ramp. Plugin failed if:</p>
+      <ul style="color: var(--ink-mid); max-width: 72ch; line-height: 1.7;">
+        <li>Engineers consistently bypass <code>/digest-spec</code> after 4-week honest use</li>
+        <li><code>/qa-check</code> produces too many false positives (engineers learn to ignore)</li>
+        <li>MCP outages exceed 10% of runs and persist &gt;2 weeks</li>
+        <li>Adoption stalls at L1 for 3+ months despite organic growth attempts</li>
+      </ul>
+      <p>Uninstall is clean: <code>/plugin uninstall md-sdlc-wf</code> then <code>/plugin marketplace remove …</code>. No data migration. No vendor lock-in. Restart any time.</p>
+
+      <p style="margin-top: 2rem; color: var(--ink-dim);">Full guide: <code>ADOPTION.md</code> at the plugin repo root.</p>
+    </section>
+
+    <!-- INSTALL -->
+    <section class="panel" data-tab="install">
+      <h2>Install</h2>
+      <p>One command in any Claude Code session.</p>
+
+<pre class="codeblock"><span class="p">/plugin marketplace add</span> github.com/carousell/md-sdlc-wf
+<span class="p">/plugin install</span> md-sdlc-wf</pre>
+
+      <p>Verify:</p>
+<pre class="codeblock"><span class="p">/plugin list</span>
+<span class="c"># md-sdlc-wf@0.1.0 — installed</span></pre>
+
+      <h3>MCP servers</h3>
+      <table class="data">
+        <thead><tr><th style="width: 24%">Server</th><th style="width: 14%">Required</th><th>Used by</th></tr></thead>
+        <tbody>
+          <tr><td class="k">claude_ai_Atlassian</td><td>yes</td><td><code>spec-digester</code> — Confluence + Jira reads</td></tr>
+          <tr><td class="k">figma</td><td>optional</td><td><code>figma-reader</code> — graceful degrade if absent</td></tr>
+        </tbody>
+      </table>
+      <p>Authenticate via <code>/mcp</code> on first use. Without <code>claude_ai_Atlassian</code>, <code>/digest-spec</code> and <code>/pilot</code> cannot run.</p>
+
+      <h3>First run</h3>
+      <p>Pick any Confluence PRD URL you have access to and run:</p>
+<pre class="codeblock"><span class="p">/digest-spec</span> <span class="s">&lt;your-confluence-prd-url&gt;</span></pre>
+      <p>That's the simplest end-to-end verification. If it renders the digest, you're set.</p>
+
+      <h3>Updates</h3>
+      <p>Re-pull the latest from the marketplace:</p>
+<pre class="codeblock"><span class="p">/plugin update</span> md-sdlc-wf</pre>
+
+      <h3>Uninstall</h3>
+<pre class="codeblock"><span class="p">/plugin uninstall</span> md-sdlc-wf
+<span class="p">/plugin marketplace remove</span> github.com/carousell/md-sdlc-wf</pre>
+
+      <h3>Feedback</h3>
+      <p>Internal Mudah team: ping <code>@kahsing</code> in Slack or open an issue in the repo.</p>
+    </section>
+
+  </div>
+
+</div>
+
+<div class="foot">
+  <strong>md-sdlc-wf v0.1.0</strong> · Engineer-side SDLC pipeline plugin for Claude Code · Mudah Engineering · <a href="https://github.com/carousell/md-sdlc-wf">github.com/carousell/md-sdlc-wf</a>
+</div>
+
+</body>
+</html>

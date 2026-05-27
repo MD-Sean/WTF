@@ -1,0 +1,53 @@
+{
+  "name": "md-sdlc-wf",
+  "version": "0.1.0",
+  "description": "Engineer-side SDLC pipeline for Mudah: PRD digestion → Figma context → repo context loading → handoff to implementation agent → AC coverage check. Chips into the existing md-auto-web .claude/ 4-layer defect filter as Layer 0 + Layer 5.",
+  "author": {
+    "name": "Sean Pang",
+    "email": "kahsing@mudah.my"
+  },
+  "license": "Proprietary — Mudah internal use",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carousell/md-sdlc-wf.git"
+  },
+  "homepage": "https://github.com/carousell/md-sdlc-wf",
+  "keywords": [
+    "sdlc",
+    "prd",
+    "confluence",
+    "figma",
+    "acceptance-criteria",
+    "mudah"
+  ],
+  "claudeCode": {
+    "minVersion": "1.0.0"
+  },
+  "components": {
+    "agents": [
+      "agents/spec-digester.md",
+      "agents/figma-reader.md",
+      "agents/context-loader.md",
+      "agents/qa-validator.md",
+      "agents/senior-frontend-engineer.md",
+      "agents/senior-code-reviewer.md"
+    ],
+    "skills": [
+      "skills/pilot",
+      "skills/digest-spec",
+      "skills/qa-check"
+    ]
+  },
+  "mcpRequirements": [
+    {
+      "server": "claude_ai_Atlassian",
+      "required": true,
+      "reason": "spec-digester reads Confluence PRDs and Jira epics"
+    },
+    {
+      "server": "figma",
+      "required": false,
+      "reason": "figma-reader pulls design context; pipeline degrades gracefully if absent"
+    }
+  ]
+}
