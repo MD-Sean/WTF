@@ -1,9 +1,0 @@
-{
-  "name": "md-sdlc-wf",
-  "description": "Engineer-side SDLC pipeline for Mudah: PRD digestion → Figma context → repo context loading → handoff to implementation agent → AC coverage check.",
-  "version": "0.1.0",
-  "author": {
-    "name": "Sean Pang",
-    "email": "kahsing@mudah.my"
-  }
-}
