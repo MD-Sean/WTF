@@ -17,11 +17,8 @@
         "email": "kahsing@mudah.my"
       },
       "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/MD-Sean/WTF.git",
-        "path": "md-sdlc-wf",
-        "ref": "main",
-        "sha": "5dad6670bef7d8ac11f6d9d51f2d1f9e0647d774"
+        "source": "url",
+        "url": "https://github.com/MD-Sean/WTF.git"
       },
       "category": "development"
     }
