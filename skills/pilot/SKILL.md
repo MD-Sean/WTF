@@ -6,7 +6,7 @@ description: >-
 
 # /pilot — Spec-to-Engineer Pipeline
 
-You are running the upstream pipeline that prepares an engineer to implement a spec. You orchestrate four agents. You halt at every phase boundary and let the human decide what to do next. Speed matters less than groundedness.
+You are running the upstream pipeline that prepares an engineer to implement a spec. You orchestrate four agents. Engineer handoffs run automatically — you only pause when TDD is incomplete. Throughput matters; the human's single decision point is group selection (Phase 4).
 
 ## Inputs
 
@@ -116,20 +116,17 @@ Context packs written:
 
 ### Phase 6 — Handoff to Engineer Agent
 
-This is the critical handoff. For each AC group, in sequence (not parallel — engineer work is human-paced):
+Handoffs run automatically in sequence (not parallel — engineer work is human-paced). No per-group prompt. The only pause is a TDD gate after each engineer returns.
 
-1. Print:
+**For each AC group:**
+
+1. Print a one-line status before invoking:
 
 ```
-Ready to hand off G<n> to senior-frontend-engineer.
-ACs: <list>
-Context pack: <path>
-Figma frames: <list of relevant node IDs from figma.json>
-
-Hand off now? [y / skip / abort]
+→ Handing off G<n> (<AC list>) to senior-frontend-engineer…
 ```
 
-2. On `y`: invoke the `senior-frontend-engineer` agent (use Task tool with `subagent_type: "senior-frontend-engineer"`). Pass:
+2. Invoke the `senior-frontend-engineer` agent. Pass:
 
 ```
 You are implementing AC group <group-id> from spec <spec-id>.
@@ -150,9 +147,29 @@ When you finish the group, stop and report what you wrote. Do not
 proceed to other AC groups — the orchestrator will dispatch those.
 ```
 
-3. On `skip`: print "Skipped G<n>." and continue to next group.
+3. **TDD gate** — when engineer returns, check their report for:
+   - Test files created (named in report)
+   - Passing test count (e.g. "7 passed, 7 total")
+   - `npm run typecheck` clean
 
-4. On `abort`: halt the entire pipeline. Pipeline state in `.pilot/<spec-id>/` is preserved.
+   **TDD complete** = all three present → print and auto-proceed:
+
+   ```
+   ✓ G<n> · <N> tests passing · typecheck clean · continuing to G<n+1>…
+   ```
+
+   **TDD incomplete** = no tests written, empty `__test__/`, failing tests, or typecheck errors → pause:
+
+   ```
+   ⚠ TDD gate failed · G<n>
+   <specific gap from engineer report>
+
+   Fix tests now, skip, or abort? [fix / skip / abort]
+   ```
+
+   - `fix` → re-invoke engineer: "Write/fix the failing tests for G<n>. Do not touch implementation files. Report test results when done." Then re-run TDD gate.
+   - `skip` → print "Skipped TDD gate for G<n> — /qa-check will flag this." Continue to next group.
+   - `abort` → halt. Pipeline state in `.pilot/<spec-id>/` is preserved.
 
 ### Phase 7 — Wrap-up
 
