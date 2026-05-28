@@ -6,19 +6,67 @@ description: >-
 
 # /pilot — Spec-to-Engineer Pipeline
 
-You are running the upstream pipeline that prepares an engineer to implement a spec. You orchestrate four agents. Engineer handoffs run automatically — you only pause when TDD is incomplete. Throughput matters; the human's single decision point is group selection (Phase 4).
+You are running the upstream pipeline that prepares an engineer to implement a spec. You orchestrate five agents (tech-doc-generator, spec-digester, figma-reader, context-loader, senior-frontend-engineer) and one code reviewer (senior-code-reviewer). Engineer handoffs run automatically — you only pause when TDD is incomplete. Throughput matters; the human's single decision point is group selection (Phase 4).
 
 ## Inputs
 
-A single argument from the user. Auto-detect the type:
+Two forms accepted:
 
-- Confluence URL → extract `pageId`, pass to `spec-digester`
-- Jira epic key (`MDP-580`) → fetch epic via Atlassian MCP, read the linked Confluence spec from the epic's description or remote links, then pass to `spec-digester`
-- Figma URL → no spec context; respond with "Pilot needs a PRD URL or Jira epic. Got a Figma URL — use `figma-reader` agent solo instead."
+**Form A — First run (no tech doc yet):**
 
-If the user invokes `/pilot` with no argument: ask once for a Confluence URL or Jira epic key. Never guess.
+```
+/pilot <prd-url-or-jira-key>
+```
+
+Generates a draft tech design doc and halts for sign-off.
+
+**Form B — Second run (tech doc signed off):**
+
+```
+/pilot <prd-url-or-jira-key> <tech-doc-url-or-path>
+```
+
+`<tech-doc-url-or-path>` is either a Confluence page URL (signed-off tech design page) or a local file path to `.pilot/<spec-id>/tech-design.md`.
+
+Auto-detect `<prd-url-or-jira-key>` type as before (Confluence URL, Jira epic key, Figma URL). If invoked with no argument: ask once. Never guess.
 
 ## Pipeline
+
+### Phase 0 — Tech Design Gate
+
+**If second argument is provided (`<tech-doc-url-or-path>`):**
+
+1. If it is a Confluence URL → fetch via `mcp__claude_ai_Atlassian__getConfluencePage` (resolve cloudId first via `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources`)
+2. If it is a local path → read the file
+3. Store as `tech_design_content` for Phase 5 context loading and Phase 6 engineer handoff
+4. Print: `Tech doc loaded · proceeding to spec digest…`
+5. Continue to Phase 1 silently.
+
+**If no second argument (first run):**
+
+1. Run Phase 1 (Digest) first to obtain `spec_id` and `digest`
+2. Dispatch `tech-doc-generator` agent:
+   ```
+   digest: <spec digest JSON>
+   arch_refs: []
+   repo_path: <current cwd>
+   output_path: .pilot/<spec-id>/tech-design.md
+   ```
+3. When agent returns, print:
+
+   ```
+   Tech design draft written to .pilot/<spec-id>/tech-design.md
+
+   Open questions requiring sign-off (<N> total):
+     • <each open question from agent return>
+
+   ⏸ Pipeline halted — get TL/PM sign-off on the tech design before proceeding.
+
+   Once signed off, re-run:
+     /pilot <original-prd-input> .pilot/<spec-id>/tech-design.md
+   ```
+
+4. Halt. Do not proceed to Phase 2.
 
 ### Phase 1 — Digest
 
@@ -103,6 +151,7 @@ For each chosen AC group, dispatch `context-loader` agent **in parallel**:
 context-loader inputs:
   spec_id, ac_group: [ACs in this group], repo_path: <current cwd>,
   figma_json_path: .pilot/<spec-id>/figma.json (if exists)
+  tech_design_path: .pilot/<spec-id>/tech-design.md (if exists)
 ```
 
 When all return, surface:
@@ -138,6 +187,11 @@ Acceptance criteria for this group:
 Figma references:
 <frame names + node IDs>
 
+Technical design:
+<paste relevant sections from tech-design.md for this AC group — API contract if group
+touches data fetching, component architecture if UI group, state management if hooks group.
+Verbatim — do not summarize.>
+
 Honor the rules summarized in the context pack. The post-edit hooks
 (lint, type-check, auto-format, mantine-styling) will fire on every
 write — produce clean code on first pass. Write tests per the team's
@@ -170,6 +224,23 @@ proceed to other AC groups — the orchestrator will dispatch those.
    - `fix` → re-invoke engineer: "Write/fix the failing tests for G<n>. Do not touch implementation files. Report test results when done." Then re-run TDD gate.
    - `skip` → print "Skipped TDD gate for G<n> — /qa-check will flag this." Continue to next group.
    - `abort` → halt. Pipeline state in `.pilot/<spec-id>/` is preserved.
+
+**Code review gate** — runs automatically after TDD gate passes:
+
+1. Dispatch `senior-code-reviewer` agent on all files written by this group's engineer:
+
+   ```
+   Review the files changed in the last engineer handoff for G<n>.
+   Check: correctness, performance, security, project rule adherence.
+   Do NOT flag style — hooks auto-format. Focus on logic bugs, race conditions,
+   stale closures, SSR correctness, missing cleanup, architectural smell.
+   ```
+
+2. When reviewer returns:
+   - **🔴 Critical or 🟡 Important issues** → re-invoke engineer: "Fix these issues from the code review before we proceed. Do not change any other files." Then re-run code review gate.
+   - **🟢 Suggestions only** → print `✓ G<n> code review passed · proceeding to G<n+1>…` and continue.
+
+3. Do not proceed to G<n+1> until code review gate passes.
 
 ### Phase 7 — Wrap-up
 
@@ -220,4 +291,5 @@ If `<repo-root>/.gitignore` exists and does not already ignore `.pilot/`, append
 - Do not enforce PR title format, branch naming, or any merge gates.
 - Do not modify the Confluence page, Figma file, or Jira epic.
 - Do not call `/qa-check` automatically — that is engineer-initiated, post-build.
-- Do not run more than one engineer handoff in parallel — humans review one chunk at a time.
+- Do not run engineer handoffs in parallel — one group at a time (implement → TDD gate → code review → next group).
+- Do not skip code review even if TDD gate passes — both gates are required.
