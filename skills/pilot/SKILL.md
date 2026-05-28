@@ -70,6 +70,8 @@ Auto-detect `<prd-url-or-jira-key>` type as before (Confluence URL, Jira epic ke
 
 ### Phase 1 — Digest
 
+> If `.pilot/<spec-id>/digest.json` already exists (i.e. this is a Form B re-run), load it directly and skip re-dispatching `spec-digester`. Still apply the Status Gate from the cached digest. Surface the spec summary as normal.
+
 1. Dispatch `spec-digester` agent with the resolved PRD reference.
 2. When it returns, surface to the user:
 
@@ -255,7 +257,7 @@ Artifacts in .pilot/<spec-id>/:
   - adr.md (if extracted)
 
 Next steps (manual):
-  - Engineer continues per-group work; running senior-code-reviewer is part of the existing workflow.
+  - Code review ran automatically per-group in Phase 6. No manual review step needed before PR.
   - Before raising PR: run /qa-check <branch> to validate AC coverage.
 ```
 
