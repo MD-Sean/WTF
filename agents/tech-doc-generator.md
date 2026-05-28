@@ -1,10 +1,10 @@
 ---
 name: tech-doc-generator
 description: >-
-  Generates a structured technical design document from a PRD digest and optional
-  existing architecture references (Confluence URLs, GitHub repo paths). Output covers
-  API contract, data flow, component architecture, SSR/client boundaries, state management,
-  risks, and open questions. Use before engineer handoff when no signed-off tech doc exists.
+  Use when a spec has been digested (spec-digester output exists) and a technical
+  design document is needed before engineer handoff — i.e. no signed-off tech-design.md
+  exists yet. Produces API contract, data flow, component architecture, SSR boundaries,
+  state management, risks, and open questions from a PRD digest and optional arch refs.
 ---
 
 # tech-doc-generator
@@ -19,7 +19,7 @@ can review and sign off before implementation begins.
 - `arch_refs`: optional array of Confluence page URLs or GitHub paths pointing to
   existing architecture docs, ERDs, sequence diagrams, or API references
 - `repo_path`: absolute path to the local repository
-- `output_path`: where to write the tech-design.md file
+- `output_path`: where to write the tech-design.md file. Defaults to `.pilot/<spec_id>/tech-design.md` where `spec_id` is `digest.spec_id` or `digest.page_id`.
 
 ## Process
 
@@ -32,14 +32,22 @@ Read `digest.goals`, `digest.acceptance_criteria`, `digest.technical_approach`,
 
 For each item in `arch_refs`:
 
-- Confluence URL → use the Atlassian MCP `getConfluencePage` tool to read content
-- GitHub path (e.g. `owner/repo/blob/main/docs/arch.md`) → use `gh api repos/{owner}/{repo}/contents/{path}` to fetch raw content and base64-decode it
+- Confluence URL →
+  1. Call `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources` to resolve cloudId from the domain.
+  2. Extract pageId from the URL path (last numeric segment).
+  3. Call `mcp__claude_ai_Atlassian__getConfluencePage` with `{ cloudId, pageId, contentFormat: "markdown" }`.
+- GitHub path (e.g. `owner/repo/blob/main/docs/arch.md`) →
+  Parse into components: owner, repo, branch, file_path from the blob URL.
+  Fetch: `gh api repos/{owner}/{repo}/contents/{file_path}?ref={branch}`
+  Decode: `echo "$response" | jq -r '.content' | base64 --decode`
 - Local file path → read directly with the Read tool
 
 Extract: existing API endpoints relevant to this spec, data models, component
 relationships, infrastructure constraints.
 
 ### 3. Read codebase patterns
+
+Check each path exists before reading (`ls <path>` or equivalent). Skip silently if absent — do not treat a missing directory as an error.
 
 From `repo_path`, read:
 
@@ -89,13 +97,17 @@ Describe what exists vs what must be created.>
 
 ## 4. Data Flow
 
-<Step-by-step from user action or page load to rendered output>
+<!-- 5-8 numbered steps. Start from user action or URL hit, end at visible rendered output.
+     Format each step: Actor → action → output artifact.
+     Example: "2. RSC calls fetchListings(queryKey) → returns ListingPage[]" -->
 
 ## 5. Component Architecture
 
-| Component          | Type   | Location                | Reuse / Create |
-| ------------------ | ------ | ----------------------- | -------------- |
-| `ExampleComponent` | Client | `src/features/Example/` | Create         |
+| Component          | Type (Server \| Client \| Shared) | Location                | Reuse / Create |
+| ------------------ | --------------------------------- | ----------------------- | -------------- |
+| `ExampleComponent` | Client                            | `src/features/Example/` | Create         |
+
+<!-- Type: Server = RSC no client state, Client = "use client" directive, Shared = pure render no hooks. Write "TBD" if unknown. -->
 
 SSR boundary: <which components must be server vs client and why>
 
