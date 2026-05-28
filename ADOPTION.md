@@ -30,7 +30,7 @@ Start at L1. Aim for L2 within 2 weeks. L3 within 8 weeks if the squad signals p
 - [ ] (Optional) Confirm Figma MCP is configured
 - [ ] Install the plugin:
   ```
-  /plugin marketplace add github.com/carousell/md-sdlc-wf
+  /plugin marketplace add github.com/MD-Sean/WTF
   /plugin install md-sdlc-wf
   ```
 - [ ] Run `/plugin list` — confirm `md-sdlc-wf@0.1.0` shows up
@@ -85,7 +85,7 @@ Once one engineer is sold, expand to the squad. Don't broadcast — show.
 - [ ] Pick a squad standup. Run `/digest-spec` live on the squad's current top-priority PRD. Show the output, no commentary.
 - [ ] Send a 1-paragraph Slack message to the squad channel:
 
-  > Trying out a Claude Code plugin for spec triage and AC coverage. `/digest-spec <Confluence URL>` gives a 100-line dense summary. `/pilot` runs the full pipeline. `/qa-check` checks AC coverage before PR. Install: `/plugin marketplace add github.com/carousell/md-sdlc-wf` then `/plugin install md-sdlc-wf`. Docs: https://sdlc-pipeline-docs.vercel.app
+  > Trying out a Claude Code plugin for spec triage and AC coverage. `/digest-spec <Confluence URL>` gives a 100-line dense summary. `/pilot` runs the full pipeline. `/qa-check` checks AC coverage before PR. Install: `/plugin marketplace add github.com/MD-Sean/WTF` then `/plugin install md-sdlc-wf`. Docs: https://sdlc-pipeline-docs.vercel.app
 
 - [ ] Stay available for 1:1 support during the first week.
 
@@ -193,7 +193,7 @@ Uninstall is clean:
 
 ```
 /plugin uninstall md-sdlc-wf
-/plugin marketplace remove github.com/carousell/md-sdlc-wf
+/plugin marketplace remove github.com/MD-Sean/WTF
 ```
 
 `.pilot/` directories remain in repos as cached state. Delete with `rm -rf .pilot/` if you want a fresh slate.
