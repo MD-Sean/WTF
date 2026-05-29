@@ -100,15 +100,15 @@
     transition: color 140ms ease, background 140ms ease;
   }
   .tabstrip label:hover { color: var(--ink); }
-  #t-overview:checked   ~ .tabstrip label[for="t-overview"],
-  #t-benefits:checked   ~ .tabstrip label[for="t-benefits"],
-  #t-pipeline:checked   ~ .tabstrip label[for="t-pipeline"],
-  #t-skills:checked     ~ .tabstrip label[for="t-skills"],
-  #t-agents:checked     ~ .tabstrip label[for="t-agents"],
-  #t-roles:checked      ~ .tabstrip label[for="t-roles"],
-  #t-adoption:checked   ~ .tabstrip label[for="t-adoption"],
-  #t-install:checked    ~ .tabstrip label[for="t-install"] {
-    color: var(--ink);
+  #t-overview:checked   ~ .hero .tabstrip label[for="t-overview"],
+  #t-benefits:checked   ~ .hero .tabstrip label[for="t-benefits"],
+  #t-pipeline:checked   ~ .hero .tabstrip label[for="t-pipeline"],
+  #t-skills:checked     ~ .hero .tabstrip label[for="t-skills"],
+  #t-agents:checked     ~ .hero .tabstrip label[for="t-agents"],
+  #t-roles:checked      ~ .hero .tabstrip label[for="t-roles"],
+  #t-adoption:checked   ~ .hero .tabstrip label[for="t-adoption"],
+  #t-install:checked    ~ .hero .tabstrip label[for="t-install"] {
+    color: oklch(0.18 0.025 270);
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     box-shadow: 0 6px 18px oklch(0.40 0.18 280 / 0.45);
   }
@@ -160,7 +160,8 @@
     position: relative;
   }
   .step .num {
-    width: 28px; height: 28px;
+    min-width: 28px; height: 28px;
+    padding: 0 0.45rem;
     border-radius: 999px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: oklch(0.18 0.025 270);
@@ -168,6 +169,7 @@
     font-weight: 700;
     font-size: 0.85rem;
     margin-bottom: 0.85rem;
+    white-space: nowrap;
   }
   .step .badge {
     display: inline-block;
@@ -353,7 +355,7 @@
     <p class="lede">Turn a Confluence PRD into a grounded implementation handoff. Parses the spec, reads Figma, loads repo-aware context, hands off to your project's implementation agent AC-by-AC. Closes the loop with a local AC coverage check before PR.</p>
 
     <div class="cta">
-      <span>/plugin marketplace add</span> github.com/MD-Sean/WTF
+      <span>/plugin marketplace add</span> MD-Sean/WTF
     </div>
 
     <div class="tabstrip">
@@ -916,40 +918,58 @@ VERDICT: WARN ⚠
     <!-- INSTALL -->
     <section class="panel" data-tab="install">
       <h2>Install</h2>
-      <p>One command in any Claude Code session.</p>
+      <p style="color: var(--ink-dim); margin-bottom: 2rem;">Under 2 minutes. Run these in any Claude Code session — terminal, IDE extension, or desktop app.</p>
 
-<pre class="codeblock"><span class="p">/plugin marketplace add</span> github.com/MD-Sean/WTF
-<span class="p">/plugin install</span> md-sdlc-wf</pre>
-
-      <p>Verify:</p>
-<pre class="codeblock"><span class="p">/plugin list</span>
+      <div class="step-row" style="margin-bottom: 2rem;">
+        <div class="step">
+          <span class="num">1</span>
+          <b>Prerequisite</b>
+          <p><a href="https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview" style="color: var(--accent);">Claude Code</a> must be installed and authenticated. Any plan works.</p>
+        </div>
+        <div class="step">
+          <span class="num">2</span>
+          <b>Add to marketplace</b>
+<pre class="codeblock" style="margin: 0.6rem 0 0;"><span class="p">/plugin marketplace add</span> MD-Sean/WTF</pre>
+        </div>
+        <div class="step">
+          <span class="num">3</span>
+          <b>Install the plugin</b>
+<pre class="codeblock" style="margin: 0.6rem 0 0;"><span class="p">/plugin install</span> md-sdlc-wf</pre>
+        </div>
+        <div class="step">
+          <span class="num">4</span>
+          <b>Verify</b>
+<pre class="codeblock" style="margin: 0.6rem 0 0;"><span class="p">/plugin list</span>
 <span class="c"># md-sdlc-wf@0.1.0 — installed</span></pre>
+        </div>
+      </div>
 
-      <h3>MCP servers</h3>
+      <h3>Connect MCP servers</h3>
+      <p>Run <code>/mcp</code> in Claude Code and authenticate. You'll be prompted on first use.</p>
       <table class="data">
         <thead><tr><th style="width: 24%">Server</th><th style="width: 14%">Required</th><th>Used by</th></tr></thead>
         <tbody>
-          <tr><td class="k">claude_ai_Atlassian</td><td>yes</td><td><code>spec-digester</code> — Confluence + Jira reads</td></tr>
-          <tr><td class="k">figma</td><td>optional</td><td><code>figma-reader</code> — graceful degrade if absent</td></tr>
+          <tr><td class="k">claude_ai_Atlassian</td><td>✓ required</td><td><code>spec-digester</code> — reads Confluence PRDs + Jira</td></tr>
+          <tr><td class="k">figma</td><td>optional</td><td><code>figma-reader</code> — reads Figma frames; degrades gracefully if absent</td></tr>
         </tbody>
       </table>
-      <p>Authenticate via <code>/mcp</code> on first use. Without <code>claude_ai_Atlassian</code>, <code>/digest-spec</code> and <code>/pilot</code> cannot run.</p>
+      <p style="color: var(--ink-dim); font-size: 0.88rem; margin-top: 0.75rem;">Without <code>claude_ai_Atlassian</code>, <code>/digest-spec</code> and <code>/pilot</code> won't run.</p>
 
-      <h3>First run</h3>
-      <p>Pick any Confluence PRD URL you have access to and run:</p>
+      <h3>Try it now</h3>
+      <p>Grab any Confluence PRD URL you have access to and run:</p>
 <pre class="codeblock"><span class="p">/digest-spec</span> <span class="s">&lt;your-confluence-prd-url&gt;</span></pre>
-      <p>That's the simplest end-to-end verification. If it renders the digest, you're set.</p>
+      <p>If it renders a digest, you're fully set up. From there, try <code>/pilot &lt;same-url&gt;</code> for the full pipeline.</p>
 
       <h3>Updates</h3>
-      <p>Re-pull the latest from the marketplace:</p>
 <pre class="codeblock"><span class="p">/plugin update</span> md-sdlc-wf</pre>
 
       <h3>Uninstall</h3>
+      <p>Clean removal — no data migration, no lock-in.</p>
 <pre class="codeblock"><span class="p">/plugin uninstall</span> md-sdlc-wf
-<span class="p">/plugin marketplace remove</span> github.com/MD-Sean/WTF</pre>
+<span class="p">/plugin marketplace remove</span> MD-Sean/WTF</pre>
 
-      <h3>Feedback</h3>
-      <p>Internal Mudah team: ping <code>@kahsing</code> in Slack or open an issue in the repo.</p>
+      <h3>Questions?</h3>
+      <p>Internal Mudah team: ping <code>@kahsing</code> in Slack. Everyone else: <a href="https://github.com/MD-Sean/WTF/issues" style="color: var(--accent);">open an issue on GitHub</a>.</p>
     </section>
 
   </div>

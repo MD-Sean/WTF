@@ -19,7 +19,7 @@ This is **Layer 0 + Layer 5** that chips into any repo's existing `.claude/` def
 Add this repo as a marketplace, then install:
 
 ```bash
-/plugin marketplace add github.com/MD-Sean/WTF
+/plugin marketplace add MD-Sean/WTF
 /plugin install md-sdlc-wf
 ```
 
