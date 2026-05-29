@@ -963,6 +963,19 @@ VERDICT: WARN ⚠
 <pre class="codeblock"><span class="p">/digest-spec</span> <span class="s">&lt;your-confluence-prd-url&gt;</span></pre>
       <p>If it renders a digest, you're fully set up. From there, try <code>/pilot &lt;same-url&gt;</code> for the full pipeline.</p>
 
+      <h3>Safety hooks</h3>
+      <p>The plugin ships a <code>PreToolUse</code> hook that blocks dangerous Bash commands for any Claude Code session running in this repo. No config needed — active automatically after install.</p>
+      <table class="data">
+        <thead><tr><th style="width: 38%">Pattern</th><th>What it blocks</th></tr></thead>
+        <tbody>
+          <tr><td class="k">rm -rf /, rm -rf ~</td><td>Destructive filesystem wipes</td></tr>
+          <tr><td class="k">git push --force main/master</td><td>Force-push to protected branches</td></tr>
+          <tr><td class="k">git reset --hard, git checkout -- ., git clean -fd</td><td>Destructive git operations</td></tr>
+          <tr><td class="k">curl | /bin/bash, wget | /bin/sh</td><td>Remote code execution via pipe</td></tr>
+        </tbody>
+      </table>
+      <p style="color: var(--ink-dim); font-size: 0.88rem; margin-top: 0.75rem;">Hook lives at <code>.claude/hooks/block-dangerous.sh</code>. Heredoc bodies are stripped before matching — commit messages containing blocked strings don't false-positive.</p>
+
       <h3>Updates</h3>
 <pre class="codeblock"><span class="p">/plugin update</span> md-sdlc-wf</pre>
 

@@ -16,13 +16,10 @@ This is **Layer 0 + Layer 5** that chips into any repo's existing `.claude/` def
 
 ## Install
 
-Add this repo as a marketplace, then install:
-
 ```bash
 /plugin marketplace add MD-Sean/WTF
 /plugin install md-sdlc-wf
 ```
-
 
 Verify:
 
@@ -33,14 +30,27 @@ Verify:
 
 ## Required MCP servers
 
-Configure these in Claude Code settings or via `/mcp`:
+Configure via `/mcp` in Claude Code. You'll be prompted to authenticate on first use.
 
 | Server | Required | Used by |
 |---|---|---|
 | `claude_ai_Atlassian` | yes | `spec-digester` (Confluence + Jira) |
 | `figma` | optional | `figma-reader` (graceful degrade if absent) |
 
-Without `claude_ai_Atlassian`, `/digest-spec` and `/pilot` cannot run. Authenticate via `/mcp` on first use.
+Without `claude_ai_Atlassian`, `/digest-spec` and `/pilot` cannot run.
+
+## Safety hooks
+
+The plugin ships a `PreToolUse` hook that blocks dangerous Bash commands in any Claude Code session running in this repo:
+
+| Pattern | Blocked |
+|---|---|
+| `rm -rf /`, `rm -rf ~` | Destructive filesystem wipes |
+| `git push --force main/master` | Force-push to protected branches |
+| `git reset --hard`, `git checkout -- .`, `git clean -fd` | Destructive git operations |
+| `curl \| /bin/bash`, `wget \| /bin/sh` | Remote code execution via pipe |
+
+Hook lives at `.claude/hooks/block-dangerous.sh`, wired in `.claude/settings.json`. Heredoc bodies (commit messages, inline scripts) are stripped before pattern matching to avoid false positives.
 
 ---
 
