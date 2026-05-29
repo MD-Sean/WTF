@@ -19,7 +19,10 @@ DENY_PATTERNS=(
   "wget.*|.*\/bin\/bash"
 )
 
-COMMAND_LOWER=$(echo "$COMMAND" | tr '[:upper:]' '[:lower:]')
+# Strip heredoc bodies (data between <<'EOF'/<<EOF and closing EOF) before matching
+STRIPPED=$(echo "$COMMAND" | awk '/<<['"'"'"]?[A-Z_]+['"'"'"]?/{skip=1; print; next} /^[A-Z_]+$/ && skip{skip=0; next} !skip{print}')
+
+COMMAND_LOWER=$(echo "$STRIPPED" | tr '[:upper:]' '[:lower:]')
 
 for pattern in "${DENY_PATTERNS[@]}"; do
   if echo "$COMMAND_LOWER" | grep -qiE "$pattern"; then
