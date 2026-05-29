@@ -30,7 +30,7 @@ Start at L1. Aim for L2 within 2 weeks. L3 within 8 weeks if the squad signals p
 - [ ] (Optional) Confirm Figma MCP is configured
 - [ ] Install the plugin:
   ```
-  /plugin marketplace add github.com/MD-Sean/WTF
+  /plugin marketplace add MD-Sean/WTF
   /plugin install md-sdlc-wf
   ```
 - [ ] Run `/plugin list` — confirm `md-sdlc-wf@0.1.0` shows up
@@ -85,7 +85,7 @@ Once one engineer is sold, expand to the squad. Don't broadcast — show.
 - [ ] Pick a squad standup. Run `/digest-spec` live on the squad's current top-priority PRD. Show the output, no commentary.
 - [ ] Send a 1-paragraph Slack message to the squad channel:
 
-  > Trying out a Claude Code plugin for spec triage and AC coverage. `/digest-spec <Confluence URL>` gives a 100-line dense summary. `/pilot` runs the full pipeline. `/qa-check` checks AC coverage before PR. Install: `/plugin marketplace add github.com/MD-Sean/WTF` then `/plugin install md-sdlc-wf`. Docs: https://sdlc-pipeline-docs.vercel.app
+  > Trying out a Claude Code plugin for spec triage and AC coverage. `/digest-spec <Confluence URL>` gives a 100-line dense summary. `/pilot` runs the full pipeline. `/qa-check` checks AC coverage before PR. Install: `/plugin marketplace add MD-Sean/WTF` then `/plugin install md-sdlc-wf`. Docs: https://sdlc-pipeline-docs.vercel.app
 
 - [ ] Stay available for 1:1 support during the first week.
 
@@ -153,6 +153,47 @@ Goal: every engineering team uses `/digest-spec` minimum, with `/pilot` on opt-i
 
 ---
 
+## Safety hooks
+
+The plugin ships a `PreToolUse` hook that blocks dangerous Bash commands in any Claude Code session running in this repo. It's wired automatically — no configuration needed after install.
+
+### What gets blocked
+
+| Pattern | Reason |
+|---|---|
+| `rm -rf /`, `rm -rf ~` | Destructive filesystem wipes |
+| `git push --force main/master` | Force-push to protected branches |
+| `git reset --hard` | Discards uncommitted work |
+| `git checkout -- .` | Bulk working-tree discard |
+| `git clean -fd` | Deletes untracked files |
+| `curl \| /bin/bash`, `wget \| /bin/sh` | Remote code execution via pipe |
+
+### How it works
+
+Hook fires on every `Bash` tool call Claude makes. The command is checked against the deny list before execution. If it matches, Claude Code gets a clear error and is asked to propose a safer alternative.
+
+Heredoc bodies — commit messages, inline scripts — are stripped before matching, so text like "removes destructive filesystem patterns" inside a commit message won't trigger a false positive.
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `.claude/hooks/block-dangerous.sh` | Hook script. Deny patterns live here. |
+| `.claude/settings.json` | Wires the hook to `PreToolUse → Bash`. Ships with the plugin. |
+
+### Extending for your repo
+
+Fork or copy `block-dangerous.sh` into your repo's `.claude/hooks/` and add patterns to `DENY_PATTERNS`. Each entry is an ERE regex matched case-insensitively after heredoc stripping:
+
+```bash
+# example: block dropping any database
+"drop (table|database|schema)"
+```
+
+Your repo's `.claude/settings.json` should wire the hook the same way the plugin does. If you already have `PreToolUse` hooks, add this one alongside — don't replace.
+
+---
+
 ## Common objections — and honest responses
 
 | Objection | Response |
@@ -193,7 +234,7 @@ Uninstall is clean:
 
 ```
 /plugin uninstall md-sdlc-wf
-/plugin marketplace remove github.com/MD-Sean/WTF
+/plugin marketplace remove MD-Sean/WTF
 ```
 
 `.pilot/` directories remain in repos as cached state. Delete with `rm -rf .pilot/` if you want a fresh slate.
