@@ -109,6 +109,7 @@
   #t-agents:checked     ~ .hero .tabstrip label[for="t-agents"],
   #t-roles:checked      ~ .hero .tabstrip label[for="t-roles"],
   #t-adoption:checked   ~ .hero .tabstrip label[for="t-adoption"],
+  #t-hooks:checked      ~ .hero .tabstrip label[for="t-hooks"],
   #t-install:checked    ~ .hero .tabstrip label[for="t-install"] {
     color: oklch(0.18 0.025 270);
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -125,6 +126,7 @@
   #t-agents:checked    ~ .panels [data-tab="agents"]    { display: block; }
   #t-roles:checked     ~ .panels [data-tab="roles"]     { display: block; }
   #t-adoption:checked  ~ .panels [data-tab="adoption"]  { display: block; }
+  #t-hooks:checked     ~ .panels [data-tab="hooks"]     { display: block; }
   #t-install:checked   ~ .panels [data-tab="install"]   { display: block; }
 
   /* Section typography */
@@ -345,6 +347,7 @@
   <input type="radio" name="tab" id="t-agents" />
   <input type="radio" name="tab" id="t-roles" />
   <input type="radio" name="tab" id="t-adoption" />
+  <input type="radio" name="tab" id="t-hooks" />
   <input type="radio" name="tab" id="t-install" />
 
   <section class="hero">
@@ -369,6 +372,7 @@
       <label for="t-agents">Agents (6)</label>
       <label for="t-roles">Who Adopts</label>
       <label for="t-adoption">Adoption Guide</label>
+      <label for="t-hooks">Hooks</label>
       <label for="t-install">Install</label>
     </div>
   </section>
@@ -918,6 +922,42 @@ VERDICT: WARN ⚠
       <p style="margin-top: 2rem; color: var(--ink-dim);">Full guide: <code>ADOPTION.md</code> at the plugin repo root.</p>
     </section>
 
+    <!-- HOOKS -->
+    <section class="panel" data-tab="hooks">
+      <h2>Safety hooks</h2>
+      <p>The plugin ships a <code>PreToolUse</code> hook that intercepts every Bash call in Claude Code sessions running in this repo. Dangerous commands are blocked before execution — no confirmation prompt, no undo.</p>
+
+      <h3>What gets blocked</h3>
+      <table class="data">
+        <thead><tr><th style="width: 40%">Pattern</th><th>What it blocks</th></tr></thead>
+        <tbody>
+          <tr><td class="k">rm -rf /, rm -rf ~</td><td>Destructive filesystem wipes</td></tr>
+          <tr><td class="k">git push --force main/master</td><td>Force-push to protected branches</td></tr>
+          <tr><td class="k">git reset --hard</td><td>Hard reset — discards uncommitted work</td></tr>
+          <tr><td class="k">git checkout -- .</td><td>Bulk file restore — discards working tree changes</td></tr>
+          <tr><td class="k">git clean -fd</td><td>Untracked file deletion</td></tr>
+          <tr><td class="k">curl | /bin/bash, wget | /bin/sh</td><td>Remote code execution via pipe</td></tr>
+        </tbody>
+      </table>
+
+      <h3>How it works</h3>
+      <p>Hook fires on every <code>Bash</code> tool call. It strips heredoc bodies (commit messages, inline scripts) before pattern matching — so text like <em>"blocks rm -rf operations"</em> inside a commit message won't trigger a false positive. If a pattern matches the actual command, Claude Code gets exit code 2 with a message to propose a safer alternative.</p>
+
+      <h3>Files</h3>
+      <table class="data">
+        <thead><tr><th style="width: 45%">File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="k">.claude/hooks/block-dangerous.sh</td><td>The hook script. Patterns live here — fork to add your own.</td></tr>
+          <tr><td class="k">.claude/settings.json</td><td>Wires the hook to <code>PreToolUse → Bash</code>. Ships with the plugin.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Extending</h3>
+      <p>Add patterns to the <code>DENY_PATTERNS</code> array in <code>block-dangerous.sh</code>. Each entry is an ERE regex matched case-insensitively against the command (heredoc bodies already stripped).</p>
+<pre class="codeblock"><span class="c"># example: block dropping any database</span>
+<span class="s">"drop (table|database|schema)"</span></pre>
+    </section>
+
     <!-- INSTALL -->
     <section class="panel" data-tab="install">
       <h2>Install</h2>
@@ -962,19 +1002,6 @@ VERDICT: WARN ⚠
       <p>Grab any Confluence PRD URL you have access to and run:</p>
 <pre class="codeblock"><span class="p">/digest-spec</span> <span class="s">&lt;your-confluence-prd-url&gt;</span></pre>
       <p>If it renders a digest, you're fully set up. From there, try <code>/pilot &lt;same-url&gt;</code> for the full pipeline.</p>
-
-      <h3>Safety hooks</h3>
-      <p>The plugin ships a <code>PreToolUse</code> hook that blocks dangerous Bash commands for any Claude Code session running in this repo. No config needed — active automatically after install.</p>
-      <table class="data">
-        <thead><tr><th style="width: 38%">Pattern</th><th>What it blocks</th></tr></thead>
-        <tbody>
-          <tr><td class="k">rm -rf /, rm -rf ~</td><td>Destructive filesystem wipes</td></tr>
-          <tr><td class="k">git push --force main/master</td><td>Force-push to protected branches</td></tr>
-          <tr><td class="k">git reset --hard, git checkout -- ., git clean -fd</td><td>Destructive git operations</td></tr>
-          <tr><td class="k">curl | /bin/bash, wget | /bin/sh</td><td>Remote code execution via pipe</td></tr>
-        </tbody>
-      </table>
-      <p style="color: var(--ink-dim); font-size: 0.88rem; margin-top: 0.75rem;">Hook lives at <code>.claude/hooks/block-dangerous.sh</code>. Heredoc bodies are stripped before matching — commit messages containing blocked strings don't false-positive.</p>
 
       <h3>Updates</h3>
 <pre class="codeblock"><span class="p">/plugin update</span> md-sdlc-wf</pre>
