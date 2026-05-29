@@ -69,9 +69,11 @@
     line-height: 1.55;
   }
   .hero .cta {
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.3rem;
     margin-bottom: 2rem;
-    padding: 0.65rem 1.2rem;
+    padding: 0.75rem 1.2rem;
     font-family: var(--mono);
     font-size: 0.92rem;
     color: var(--ink);
@@ -355,7 +357,8 @@
     <p class="lede">Turn a Confluence PRD into a grounded implementation handoff. Parses the spec, reads Figma, loads repo-aware context, hands off to your project's implementation agent AC-by-AC. Closes the loop with a local AC coverage check before PR.</p>
 
     <div class="cta">
-      <span>/plugin marketplace add</span> MD-Sean/WTF
+      <div><span>/plugin marketplace add</span> MD-Sean/WTF</div>
+      <div><span>/plugin install</span> md-sdlc-wf</div>
     </div>
 
     <div class="tabstrip">
